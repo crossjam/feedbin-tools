@@ -1,4 +1,0 @@
-click
-requests
-requests-cache
-keyring
