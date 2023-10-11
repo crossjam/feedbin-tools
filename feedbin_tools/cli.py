@@ -1,13 +1,10 @@
 import json
 import logging
 import sys
-from itertools import islice
+from itertools import islice, zip_longest
 from pprint import pformat
 
-
 import click
-
-from itertools import zip_longest
 
 from .logconfig import DEFAULT_LOG_FORMAT, logging_config
 
@@ -32,6 +29,7 @@ def grouper(iterable, n, *, incomplete="fill", fillvalue=None):
         return zip(*args)
     else:
         raise ValueError("Expected fill, strict, or ignore")
+
 
 # Anticipating usage of same function once moving to Python 3.12
 # https://docs.python.org/3/library/itertools.html#itertools.batched
@@ -99,14 +97,18 @@ def subscriptions(ctx):
     resp = session.get("https://api.feedbin.com/v2/subscriptions.json", auth=auth)
     resp.raise_for_status()
 
-    json.dump(resp.json(), sys.stdout)
+    for item in resp.json():
+        sys.stdout.write(json.dumps(item) + "\n")
 
 
 @cli.command(name="starred")
-def starred():
+@click.option("-b", "--chunk-size", type=click.INT, default=75)
+@click.pass_context
+def starred(ctx, chunk_size):
     "Command description goes here"
 
-    CHUNK_SIZE = 75
+    auth = auth_from_context(ctx)
+
     session = requests_cache.CachedSession("memory_cache", backend="memory")
     resp = session.get("https://api.feedbin.com/v2/starred_entries.json")
 
@@ -116,12 +118,12 @@ def starred():
 
     logging.info("Starred entries id count: %d", len(starred_ids))
 
-    for i, chunk in enumerate(
-        grouper(starred_ids, CHUNK_SIZE, incomplete="fill", fillvalue=None), 1
-    ):
+    clean_chunks = []
+    for i, chunk in enumerate(batched(starred_ids, chunk_size), 1):
         clean_chunk = [v for v in chunk if v]
+        clean_chunks.append(clean_chunk)
+    logging.info("Processed %d chunks of size %d or less", i, chunk_size)
 
-    logging.info("Processed %d chunks of size %d or less", i, CHUNK_SIZE)
 
 def paginated_request(request_url, auth=None, params={}):
     logging.debug("requesting with potential pagination: %s", request_url)
@@ -199,4 +201,3 @@ def feed(ctx, feed_id, extended):
 
     for item in paginated_request(entries_url, auth=None, params=params):
         sys.stdout.write(json.dumps(item) + "\n")
->>>>>>> main
