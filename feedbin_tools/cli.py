@@ -72,39 +72,33 @@ def subscriptions(ctx):
     json.dump(resp.json(), sys.stdout)
 
 
-@cli.command(name="feed")
-@click.argument("feed_id")
-@click.pass_context
-def feed(ctx, feed_id):
-    """
-    Fetch entries for feedbin feed FEED_ID and emit as JSON
-    """
+def paginated_request(request_url, auth=None, params={}):
+    logging.debug("requesting with potential pagination: %s", request_url)
 
     session = requests_cache.CachedSession()
-    auth = auth_from_context(ctx)
-
-    entries_url = f"https://api.feedbin.com/v2/feeds/{int(feed_id)}/entries.json"
 
     resp = session.get(
-        entries_url,
+        request_url,
         auth=auth,
-        params={"mode": "extended"},
+        params=params,
     )
     resp.raise_for_status()
 
     logging.debug("resp headers:\n %s", pformat(list(resp.headers.items())))
 
     record_count = int(resp.headers.get("X-Feedbin-Record-Count", -1))
-    logging.info("Total records in feed: %s", record_count)
+    logging.info("Total records for url: %s", record_count)
 
     items = resp.json()
 
     logging.info("Total records in response: %s", len(items))
 
     for item in items:
-        sys.stdout.write(json.dumps(item) + "\n")
+        yield item
 
     while "Links" in resp.headers:
+        # Requests will do the following automatagically for the ’link’ header
+        # Unfortunately the feedbin api uses the ’links’ header
         links = parse_header_links(resp.headers["links"])
 
         resolved_links = {}
@@ -123,7 +117,7 @@ def feed(ctx, feed_id):
         resp = session.get(
             next_url,
             auth=auth,
-            params={"mode": "extended"},
+            params=params,
         )
         resp.raise_for_status()
 
@@ -132,4 +126,25 @@ def feed(ctx, feed_id):
         logging.info("Total records in response: %s", len(items))
 
         for item in items:
-            sys.stdout.write(json.dumps(item) + "\n")
+            yield item
+
+
+@cli.command(name="feed")
+@click.option("--extended/--no-extended", default=False)
+@click.argument("feed_id")
+@click.pass_context
+def feed(ctx, feed_id, extended):
+    """
+    Fetch entries for feedbin feed FEED_ID and emit as JSON
+    """
+
+    auth = auth_from_context(ctx)
+
+    entries_url = f"https://api.feedbin.com/v2/feeds/{int(feed_id)}/entries.json"
+
+    params = {"mode": "extended"} if extended else {}
+
+    logging.info("Request params: %s", params)
+
+    for item in paginated_request(entries_url, auth=None, params=params):
+        sys.stdout.write(json.dumps(item) + "\n")
