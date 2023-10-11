@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from itertools import islice, zip_longest
+from itertools import islice
 from pprint import pformat
 
 import click
@@ -15,22 +15,6 @@ from requests.utils import parse_header_links
 import requests_cache
 
 
-def grouper(iterable, n, *, incomplete="fill", fillvalue=None):
-    "Collect data into non-overlapping fixed-length chunks or blocks"
-    # grouper('ABCDEFG', 3, fillvalue='x') --> ABC DEF Gxx
-    # grouper('ABCDEFG', 3, incomplete='strict') --> ABC DEF ValueError
-    # grouper('ABCDEFG', 3, incomplete='ignore') --> ABC DEF
-    args = [iter(iterable)] * n
-    if incomplete == "fill":
-        return zip_longest(*args, fillvalue=fillvalue)
-    if incomplete == "strict":
-        return zip(*args, strict=True)
-    if incomplete == "ignore":
-        return zip(*args)
-    else:
-        raise ValueError("Expected fill, strict, or ignore")
-
-
 # Anticipating usage of same function once moving to Python 3.12
 # https://docs.python.org/3/library/itertools.html#itertools.batched
 def batched(iterable, n):
@@ -40,6 +24,63 @@ def batched(iterable, n):
     it = iter(iterable)
     while batch := tuple(islice(it, n)):
         yield batch
+
+
+def paginated_request(request_url, auth=None, params={}):
+    logging.debug("requesting with potential pagination: %s", request_url)
+
+    session = requests_cache.CachedSession()
+
+    resp = session.get(
+        request_url,
+        auth=auth,
+        params=params,
+    )
+    resp.raise_for_status()
+
+    logging.debug("resp headers:\n %s", pformat(list(resp.headers.items())))
+
+    record_count = int(resp.headers.get("X-Feedbin-Record-Count", -1))
+    logging.info("Total records for url: %s", record_count)
+
+    items = resp.json()
+
+    logging.info("Total records in response: %s", len(items))
+
+    for item in items:
+        yield item
+
+    while "Links" in resp.headers:
+        # Requests will do the following automatagically for the ’link’ header
+        # Unfortunately the feedbin api uses the ’links’ header
+        links = parse_header_links(resp.headers["links"])
+
+        resolved_links = {}
+        for link in links:
+            key = link.get("rel") or link.get("url")
+            resolved_links[key] = link
+
+        logging.info("Response pagination: %s", resolved_links)
+
+        if "next" not in resolved_links:
+            break
+
+        next_url = resolved_links["next"]["url"]
+
+        logging.info("Fetching next page: %s", next_url)
+        resp = session.get(
+            next_url,
+            auth=auth,
+            params=params,
+        )
+        resp.raise_for_status()
+
+        items = resp.json()
+
+        logging.info("Total records in response: %s", len(items))
+
+        for item in items:
+            yield item
 
 
 @click.group()
@@ -103,14 +144,19 @@ def subscriptions(ctx):
 
 @cli.command(name="starred")
 @click.option("-b", "--chunk-size", type=click.INT, default=75)
+@click.option("--extended/--no-extended", default=False)
+@click.option("--ids/--no-ids", default=False)
 @click.pass_context
-def starred(ctx, chunk_size):
+def starred(ctx, chunk_size, extended, ids):
     "Command description goes here"
 
+    chunk_size = min(chunk_size, 100)
+    logging.info("Chunk size: %d", chunk_size)
     auth = auth_from_context(ctx)
+    params = {"mode": "extended"} if extended else {}
 
-    session = requests_cache.CachedSession("memory_cache", backend="memory")
-    resp = session.get("https://api.feedbin.com/v2/starred_entries.json")
+    session = requests_cache.CachedSession()
+    resp = session.get("https://api.feedbin.com/v2/starred_entries.json", auth=auth)
 
     resp.raise_for_status()
 
@@ -122,64 +168,27 @@ def starred(ctx, chunk_size):
     for i, chunk in enumerate(batched(starred_ids, chunk_size), 1):
         clean_chunk = [v for v in chunk if v]
         clean_chunks.append(clean_chunk)
-    logging.info("Processed %d chunks of size %d or less", i, chunk_size)
+    logging.info("Processing %d chunks of size %d or less", i, chunk_size)
 
+    if ids:
+        logging.info("Emitting starred item ids")
+        for chunk in clean_chunks:
+            sys.stdout.write("\n".join([str(v) for v in chunk]))
+            sys.stdout.write("\n")
+    else:
+        logging.info("Emitting starred items for %d chunks", len(clean_chunks))
+        for i, chunk in enumerate(clean_chunks, 1):
+            params["ids"] = ",".join([str(v) for v in chunk])
 
-def paginated_request(request_url, auth=None, params={}):
-    logging.debug("requesting with potential pagination: %s", request_url)
+            logging.info("Fetching entries for chunk %d", i)
+            logging.debug("ids=%s", params["ids"])
+            resp = session.get(
+                "https://api.feedbin.com/v2/entries.json", auth=auth, params=params
+            )
+            resp.raise_for_status()
 
-    session = requests_cache.CachedSession()
-
-    resp = session.get(
-        request_url,
-        auth=auth,
-        params=params,
-    )
-    resp.raise_for_status()
-
-    logging.debug("resp headers:\n %s", pformat(list(resp.headers.items())))
-
-    record_count = int(resp.headers.get("X-Feedbin-Record-Count", -1))
-    logging.info("Total records for url: %s", record_count)
-
-    items = resp.json()
-
-    logging.info("Total records in response: %s", len(items))
-
-    for item in items:
-        yield item
-
-    while "Links" in resp.headers:
-        # Requests will do the following automatagically for the ’link’ header
-        # Unfortunately the feedbin api uses the ’links’ header
-        links = parse_header_links(resp.headers["links"])
-
-        resolved_links = {}
-        for link in links:
-            key = link.get("rel") or link.get("url")
-            resolved_links[key] = link
-
-        logging.info("Response pagination: %s", resolved_links)
-
-        if "next" not in resolved_links:
-            break
-
-        next_url = resolved_links["next"]["url"]
-
-        logging.info("Fetching next page: %s", next_url)
-        resp = session.get(
-            next_url,
-            auth=auth,
-            params=params,
-        )
-        resp.raise_for_status()
-
-        items = resp.json()
-
-        logging.info("Total records in response: %s", len(items))
-
-        for item in items:
-            yield item
+            for item in resp.json():
+                sys.stdout.write(json.dumps(item) + "\n")
 
 
 @cli.command(name="feed")
@@ -199,5 +208,5 @@ def feed(ctx, feed_id, extended):
 
     logging.info("Request params: %s", params)
 
-    for item in paginated_request(entries_url, auth=None, params=params):
+    for item in paginated_request(entries_url, auth=auth, params=params):
         sys.stdout.write(json.dumps(item) + "\n")
