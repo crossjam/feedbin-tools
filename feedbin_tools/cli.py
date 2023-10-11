@@ -1,7 +1,9 @@
 import json
 import logging
 import sys
+from itertools import islice
 from pprint import pformat
+
 
 import click
 
@@ -12,6 +14,17 @@ from requests.auth import HTTPBasicAuth
 from requests.utils import parse_header_links
 
 import requests_cache
+
+
+# Anticipating usage of same function once moving to Python 3.12
+# https://docs.python.org/3/library/itertools.html#itertools.batched
+def batched(iterable, n):
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    if n < 1:
+        raise ValueError("n must be at least one")
+    it = iter(iterable)
+    while batch := tuple(islice(it, n)):
+        yield batch
 
 
 @click.group()
