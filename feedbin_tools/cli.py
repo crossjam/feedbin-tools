@@ -146,8 +146,9 @@ def subscriptions(ctx):
 @click.option("-b", "--chunk-size", type=click.INT, default=75)
 @click.option("--extended/--no-extended", default=False)
 @click.option("--ids/--no-ids", default=False)
+@click.option("--limit", type=click.INT, default=-1)
 @click.pass_context
-def starred(ctx, chunk_size, extended, ids):
+def starred(ctx, chunk_size, extended, ids, limit):
     "Command description goes here"
 
     chunk_size = min(chunk_size, 100)
@@ -172,11 +173,19 @@ def starred(ctx, chunk_size, extended, ids):
 
     if ids:
         logging.info("Emitting starred item ids")
+        total_emitted = 0
         for chunk in clean_chunks:
-            sys.stdout.write("\n".join([str(v) for v in chunk]))
-            sys.stdout.write("\n")
+            for v in chunk:
+                if 0 <= limit <= total_emitted:
+                    logging.info("Reached limit of %d, completed", limit)
+                    return
+
+                sys.stdout.write(str(v) + "\n")
+                total_emitted += 1
     else:
         logging.info("Emitting starred items for %d chunks", len(clean_chunks))
+        total_emitted = 0
+
         for i, chunk in enumerate(clean_chunks, 1):
             params["ids"] = ",".join([str(v) for v in chunk])
 
@@ -188,14 +197,20 @@ def starred(ctx, chunk_size, extended, ids):
             resp.raise_for_status()
 
             for item in resp.json():
+                if 0 <= limit <= total_emitted:
+                    logging.info("Reached limit of %d, completed", limit)
+                    return
+
                 sys.stdout.write(json.dumps(item) + "\n")
+                total_emitted += 1
 
 
 @cli.command(name="feed")
 @click.option("--extended/--no-extended", default=False)
+@click.option("--limit", type=click.INT, default=-1)
 @click.argument("feed_id")
 @click.pass_context
-def feed(ctx, feed_id, extended):
+def feed(ctx, feed_id, extended, limit):
     """
     Fetch entries for feedbin feed FEED_ID and emit as JSON
     """
@@ -208,5 +223,11 @@ def feed(ctx, feed_id, extended):
 
     logging.info("Request params: %s", params)
 
+    total_emitted = 0
     for item in paginated_request(entries_url, auth=auth, params=params):
+        if 0 <= limit <= total_emitted:
+            logging.info("Reached limit of %d, completed", limit)
+            return
+
         sys.stdout.write(json.dumps(item) + "\n")
+        total_emitted += 1
