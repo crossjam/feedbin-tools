@@ -3,6 +3,8 @@ import logging
 import sys
 from itertools import islice
 from pprint import pformat
+from datetime import datetime, timezone
+
 
 import click
 
@@ -201,6 +203,10 @@ def starred(ctx, chunk_size, extended, ids, limit):
                     logging.info("Reached limit of %d, completed", limit)
                     return
 
+                current_utc = datetime.now(timezone.utc)
+                iso_format = current_utc.isoformat()
+                item["x-retrieved-at"] = iso_format
+
                 sys.stdout.write(json.dumps(item) + "\n")
                 total_emitted += 1
 
@@ -228,6 +234,11 @@ def feed(ctx, feed_id, extended, limit):
         if 0 <= limit <= total_emitted:
             logging.info("Reached limit of %d, completed", limit)
             return
+
+        current_utc = datetime.now(timezone.utc)
+        iso_format = current_utc.isoformat()
+
+        item["x-retrieved-at"] = iso_format
 
         sys.stdout.write(json.dumps(item) + "\n")
         total_emitted += 1
