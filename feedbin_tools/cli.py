@@ -28,6 +28,10 @@ def batched(iterable, n):
         yield batch
 
 
+def json_bool(val):
+    return str(bool(val)).lower()
+
+
 def paginated_request(request_url, auth=None, params={}):
     logging.debug("requesting with potential pagination: %s", request_url)
 
@@ -240,5 +244,59 @@ def feed(ctx, feed_id, extended, limit):
 
         item["x-retrieved-at"] = iso_format
 
+        sys.stdout.write(json.dumps(item) + "\n")
+        total_emitted += 1
+
+
+@cli.command(name="entries")
+@click.option("--read/--unread", default=False)
+@click.option("--starred/--no-starred", default=False)
+@click.option("--extended/--no-extended", default=False)
+@click.option("--limit", type=click.INT, default=-1)
+@click.option("-b", "--per-page", type=click.INT, default=75)
+@click.option("--include-original/--no-include-original", default=False)
+@click.option("--include-enclosure/--no-include-enclosure", default=False)
+@click.option("--include-content-diff/--no-include-content-diff", default=False)
+@click.pass_context
+def entries(
+    ctx,
+    read,
+    starred,
+    extended,
+    limit,
+    per_page,
+    include_original,
+    include_enclosure,
+    include_content_diff,
+):
+    """
+    Fetch entries for the authed feedbin user and emit as JSON
+    """
+
+    auth = auth_from_context(ctx)
+
+    entries_url = f"https://api.feedbin.com/v2/entries.json"
+
+    params = {"mode": "extended"} if extended else {}
+    params["read"] = json_bool(read) if not starred else "starred"
+    params["starred"] = json_bool(starred)
+    params["per_page"] = per_page
+    params["include_original"] = json_bool(include_original)
+    params["include_enclosure"] = json_bool(include_enclosure)
+    params["include_content_diff"] = json_bool(include_content_diff)
+
+    logging.info("Request params: %s", params)
+
+    total_emitted = 0
+    for item in paginated_request(entries_url, auth=auth, params=params):
+        if 0 <= limit <= total_emitted:
+            logging.info("Reached limit of %d, completed", limit)
+            return
+
+        current_utc = datetime.now(timezone.utc)
+        iso_format = current_utc.isoformat()
+
+        item["x-retrieved-at"] = iso_format
+        item["x-read-status"] = params["read"]
         sys.stdout.write(json.dumps(item) + "\n")
         total_emitted += 1
