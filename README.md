@@ -10,7 +10,9 @@ A command line toolkit for working with the [Feedbin HTTP API](https://github.co
 
 ## Installation
 
-Install this tool using `pip`:
+Install this tool using `pip`. Even better use
+[`pipx`](https://pypa.github.io/pipx/) which should work perfectly
+fine with the URL below:
 
     pip install git+https://github.com/crossjam/feedbin-tools.git
 
