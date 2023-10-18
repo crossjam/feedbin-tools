@@ -26,6 +26,18 @@ You can also use:
 
     python -m feedbin_tools --help
 
+
+<!-- [[[cog
+import cog
+from feedbin_tools import cli
+from click.testing import CliRunner
+runner = CliRunner()
+result = runner.invoke(cli.cli, ["--help"])
+help = result.output.replace("Usage: cli", "Usage: feedbin-tools")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
 ```
 Usage: feedbin-tools [OPTIONS] COMMAND [ARGS]...
 
@@ -33,8 +45,8 @@ Usage: feedbin-tools [OPTIONS] COMMAND [ARGS]...
   https://github.com/feedbin/feedbin-api/
 
   Due to the use of the requests library for HTTP, .netrc is honored which is
-  another means of setting the HTTP Basic Auth user and password for the
-  feedbin endpoints
+  another means of setting the HTTP Basic Auth user and password for the feedbin
+  endpoints
 
 Options:
   --version          Show the version and exit.
@@ -48,9 +60,11 @@ Options:
 Commands:
   entries        Fetch entries for the authed feedbin user and emit as JSON
   feed           Fetch entries for feedbin feed FEED_ID and emit as JSON
-  starred        Fetch feedbin starred entries for the authed feedbin...
+  starred        Fetch feedbin starred entries for the authed feedbin user...
   subscriptions  Fetch feedbin subscriptions for the authed feedbin user...
+
 ```
+<!-- [[[end]]] -->
 
 ## Development
 
