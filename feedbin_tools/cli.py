@@ -107,11 +107,28 @@ def paginated_request(request_url, auth=None, params={}):
     type=click.Path(dir_okay=False, writable=True, resolve_path=True),
     default=None,
 )
-@click.option("--user", type=click.STRING, envvar="FEEDBIN_USER")
-@click.option("--password", type=click.STRING, envvar="FEEDBIN_PASSWORD")
+@click.option(
+    "--user",
+    type=click.STRING,
+    envvar="FEEDBIN_USER",
+    help="feedbin user, also via FEEDBIN_USER envvar",
+)
+@click.option(
+    "--password",
+    type=click.STRING,
+    envvar="FEEDBIN_PASSWORD",
+    help="feedbin password, also via FEEDBIN_PASSWORD envvar",
+)
 @click.pass_context
 def cli(ctx, log_format, log_level, log_file, user=None, password=None):
-    "Tools for Working with the Feedbin API"
+    """A command line toolkit for working with the Feedbin HTTP API
+    https://github.com/feedbin/feedbin-api/
+
+    Due to the use of the requests library for HTTP, .netrc is honored
+    which is another means of setting the HTTP Basic Auth user and
+    password for the feedbin endpoints
+
+    """
 
     ctx.ensure_object(dict)
     ctx.obj["feedbin_password"] = password
@@ -133,20 +150,34 @@ def auth_from_context(ctx):
 
 
 @cli.command(name="subscriptions")
+@click.option("--extended/--no-extended", default=False)
 @click.pass_context
-def subscriptions(ctx):
+def subscriptions(ctx, extended):
     """
-    Fetch feedbin subscriptions and emit as JSON
+    Fetch feedbin subscriptions for the authed feedbin user and emit as JSON
     """
 
     session = requests_cache.CachedSession()
     auth = auth_from_context(ctx)
 
-    resp = session.get("https://api.feedbin.com/v2/subscriptions.json", auth=auth)
+    params = {"mode": "extended"} if extended else {}
+
+    logging.info("Request params: %s", params)
+    resp = session.get(
+        "https://api.feedbin.com/v2/subscriptions.json", auth=auth, params=params
+    )
     resp.raise_for_status()
 
-    for item in resp.json():
-        sys.stdout.write(json.dumps(item) + "\n")
+    try:
+        for item in resp.json():
+            sys.stdout.write(json.dumps(item) + "\n")
+    except IOError:
+        logging.info("Output endpoint closed, exiting")
+
+    try:
+        sys.stdout.close()
+    except IOError:
+        pass
 
 
 @cli.command(name="starred")
@@ -156,7 +187,9 @@ def subscriptions(ctx):
 @click.option("--limit", type=click.INT, default=-1)
 @click.pass_context
 def starred(ctx, chunk_size, extended, ids, limit):
-    "Command description goes here"
+    """
+    Fetch feedbin starred entries for the authed feedbin user and emit as JSON
+    """
 
     chunk_size = min(chunk_size, 100)
     logging.info("Chunk size: %d", chunk_size)
