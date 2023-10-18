@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 
 import click
+from dateparser import parse as dtparse
 
 from .logconfig import DEFAULT_LOG_FORMAT, logging_config
 
@@ -26,6 +27,10 @@ def batched(iterable, n):
     it = iter(iterable)
     while batch := tuple(islice(it, n)):
         yield batch
+
+
+def json_bool(val):
+    return str(bool(val)).lower()
 
 
 def paginated_request(request_url, auth=None, params={}):
@@ -102,11 +107,28 @@ def paginated_request(request_url, auth=None, params={}):
     type=click.Path(dir_okay=False, writable=True, resolve_path=True),
     default=None,
 )
-@click.option("--user", type=click.STRING, envvar="FEEDBIN_USER")
-@click.option("--password", type=click.STRING, envvar="FEEDBIN_PASSWORD")
+@click.option(
+    "--user",
+    type=click.STRING,
+    envvar="FEEDBIN_USER",
+    help="feedbin user, also via FEEDBIN_USER envvar",
+)
+@click.option(
+    "--password",
+    type=click.STRING,
+    envvar="FEEDBIN_PASSWORD",
+    help="feedbin password, also via FEEDBIN_PASSWORD envvar",
+)
 @click.pass_context
 def cli(ctx, log_format, log_level, log_file, user=None, password=None):
-    "Tools for Working with the Feedbin API"
+    """A command line toolkit for working with the Feedbin HTTP API
+    https://github.com/feedbin/feedbin-api/
+
+    Due to the use of the requests library for HTTP, .netrc is honored
+    which is another means of setting the HTTP Basic Auth user and
+    password for the feedbin endpoints
+
+    """
 
     ctx.ensure_object(dict)
     ctx.obj["feedbin_password"] = password
@@ -128,20 +150,34 @@ def auth_from_context(ctx):
 
 
 @cli.command(name="subscriptions")
+@click.option("--extended/--no-extended", default=False)
 @click.pass_context
-def subscriptions(ctx):
+def subscriptions(ctx, extended):
     """
-    Fetch feedbin subscriptions and emit as JSON
+    Fetch feedbin subscriptions for the authed feedbin user and emit as JSON
     """
 
     session = requests_cache.CachedSession()
     auth = auth_from_context(ctx)
 
-    resp = session.get("https://api.feedbin.com/v2/subscriptions.json", auth=auth)
+    params = {"mode": "extended"} if extended else {}
+
+    logging.info("Request params: %s", params)
+    resp = session.get(
+        "https://api.feedbin.com/v2/subscriptions.json", auth=auth, params=params
+    )
     resp.raise_for_status()
 
-    for item in resp.json():
-        sys.stdout.write(json.dumps(item) + "\n")
+    try:
+        for item in resp.json():
+            sys.stdout.write(json.dumps(item) + "\n")
+    except IOError:
+        logging.info("Output endpoint closed, exiting")
+
+    try:
+        sys.stdout.close()
+    except IOError:
+        pass
 
 
 @cli.command(name="starred")
@@ -151,7 +187,9 @@ def subscriptions(ctx):
 @click.option("--limit", type=click.INT, default=-1)
 @click.pass_context
 def starred(ctx, chunk_size, extended, ids, limit):
-    "Command description goes here"
+    """
+    Fetch feedbin starred entries for the authed feedbin user and emit as JSON
+    """
 
     chunk_size = min(chunk_size, 100)
     logging.info("Chunk size: %d", chunk_size)
@@ -240,5 +278,71 @@ def feed(ctx, feed_id, extended, limit):
 
         item["x-retrieved-at"] = iso_format
 
+        sys.stdout.write(json.dumps(item) + "\n")
+        total_emitted += 1
+
+
+@cli.command(name="entries")
+@click.option("--read/--unread", default=False)
+@click.option("--starred/--no-starred", default=False)
+@click.option("--extended/--no-extended", default=False)
+@click.option("--limit", type=click.INT, default=-1)
+@click.option("-b", "--per-page", type=click.INT, default=75)
+@click.option("--since", type=click.STRING, default="")
+@click.option("--include-original/--no-include-original", default=False)
+@click.option("--include-enclosure/--no-include-enclosure", default=False)
+@click.option("--include-content-diff/--no-include-content-diff", default=False)
+@click.pass_context
+def entries(
+    ctx,
+    read,
+    starred,
+    extended,
+    limit,
+    per_page,
+    since,
+    include_original,
+    include_enclosure,
+    include_content_diff,
+):
+    """
+    Fetch entries for the authed feedbin user and emit as JSON
+    """
+
+    auth = auth_from_context(ctx)
+
+    entries_url = f"https://api.feedbin.com/v2/entries.json"
+
+    params = {"mode": "extended"} if extended else {}
+    params["read"] = json_bool(read) if not starred else "starred"
+    params["starred"] = json_bool(starred)
+    params["per_page"] = per_page
+    params["include_original"] = json_bool(include_original)
+    params["include_enclosure"] = json_bool(include_enclosure)
+    params["include_content_diff"] = json_bool(include_content_diff)
+
+    if since:
+        dt = dtparse(
+            since, settings={"TO_TIMEZONE": "UTC", "RETURN_AS_TIMEZONE_AWARE": True}
+        )
+        if not dt:
+            logging.error("Failed to parse since %s as a date time", since)
+            raise ValueError(f"Unrecognized dateparser input string: '{since}'")
+        else:
+            logging.info("Retrieving entries after: %s", dt.isoformat())
+
+    logging.info("Request params: %s", params)
+
+    total_emitted = 0
+    for item in paginated_request(entries_url, auth=auth, params=params):
+        if 0 <= limit <= total_emitted:
+            logging.info("Reached limit of %d, completed", limit)
+            return
+
+        current_utc = datetime.now(timezone.utc)
+        iso_format = current_utc.isoformat()
+
+        item["x-retrieved-at"] = iso_format
+        item["x-read-status"] = params["read"]
         sys.stdout.write(json.dumps(item) + "\n")
         total_emitted += 1
