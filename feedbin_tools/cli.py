@@ -150,9 +150,14 @@ def auth_from_context(ctx):
 
 
 @cli.command(name="subscriptions")
-@click.option("--extended/--no-extended", default=False)
+@click.option(
+    "--since", type=click.STRING, default="", help="Return entries after this date"
+)
+@click.option(
+    "--extended/--no-extended", default=False, help="Include extended information"
+)
 @click.pass_context
-def subscriptions(ctx, extended):
+def subscriptions(ctx, since, extended):
     """
     Fetch feedbin subscriptions for the authed feedbin user and emit as JSON
     """
@@ -161,6 +166,17 @@ def subscriptions(ctx, extended):
     auth = auth_from_context(ctx)
 
     params = {"mode": "extended"} if extended else {}
+
+    if since:
+        dt = dtparse(
+            since, settings={"TO_TIMEZONE": "UTC", "RETURN_AS_TIMEZONE_AWARE": True}
+        )
+        if not dt:
+            logging.error("Failed to parse since %s as a date time", since)
+            raise ValueError(f"Unrecognized dateparser input string: '{since}'")
+        else:
+            logging.info("Retrieving entries after: %s", dt.isoformat())
+            params["since"] = dt.isoformat()
 
     logging.info("Request params: %s", params)
     resp = session.get(
@@ -288,7 +304,9 @@ def feed(ctx, feed_id, extended, limit):
 @click.option("--extended/--no-extended", default=False)
 @click.option("--limit", type=click.INT, default=-1)
 @click.option("-b", "--per-page", type=click.INT, default=75)
-@click.option("--since", type=click.STRING, default="")
+@click.option(
+    "--since", type=click.STRING, default="", help="Return entries after this date"
+)
 @click.option("--include-original/--no-include-original", default=False)
 @click.option("--include-enclosure/--no-include-enclosure", default=False)
 @click.option("--include-content-diff/--no-include-content-diff", default=False)
@@ -330,6 +348,7 @@ def entries(
             raise ValueError(f"Unrecognized dateparser input string: '{since}'")
         else:
             logging.info("Retrieving entries after: %s", dt.isoformat())
+            params["since"] = dt.isoformat()
 
     logging.info("Request params: %s", params)
 
