@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 
 import click
+from dateparser import parse as dtparse
 
 from .logconfig import DEFAULT_LOG_FORMAT, logging_config
 
@@ -254,6 +255,7 @@ def feed(ctx, feed_id, extended, limit):
 @click.option("--extended/--no-extended", default=False)
 @click.option("--limit", type=click.INT, default=-1)
 @click.option("-b", "--per-page", type=click.INT, default=75)
+@click.option("--since", type=click.STRING, default="")
 @click.option("--include-original/--no-include-original", default=False)
 @click.option("--include-enclosure/--no-include-enclosure", default=False)
 @click.option("--include-content-diff/--no-include-content-diff", default=False)
@@ -265,6 +267,7 @@ def entries(
     extended,
     limit,
     per_page,
+    since,
     include_original,
     include_enclosure,
     include_content_diff,
@@ -284,6 +287,16 @@ def entries(
     params["include_original"] = json_bool(include_original)
     params["include_enclosure"] = json_bool(include_enclosure)
     params["include_content_diff"] = json_bool(include_content_diff)
+
+    if since:
+        dt = dtparse(
+            since, settings={"TO_TIMEZONE": "UTC", "RETURN_AS_TIMEZONE_AWARE": True}
+        )
+        if not dt:
+            logging.error("Failed to parse since %s as a date time", since)
+            raise ValueError(f"Unrecognized dateparser input string: '{since}'")
+        else:
+            logging.info("Retrieving entries after: %s", dt.isoformat())
 
     logging.info("Request params: %s", params)
 
