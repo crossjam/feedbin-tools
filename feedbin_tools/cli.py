@@ -365,3 +365,22 @@ def entries(
         item["x-read-status"] = params["read"]
         sys.stdout.write(json.dumps(item) + "\n")
         total_emitted += 1
+
+
+@cli.command(name="feedmeta")
+@click.argument("feed_id", type=click.INT)
+@click.pass_context
+def feed(ctx, feed_id):
+    auth = auth_from_context(ctx)
+    url = f"https://api.feedbin.com/v2/feeds/{feed_id}.json"
+
+    session = requests_cache.CachedSession()
+
+    resp = session.get(url, auth=auth)
+
+    sys.stdout.write(json.dumps(resp.json()) + "\n")
+
+    try:
+        sys.stdout.close()
+    except IOError:
+        pass
