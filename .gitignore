@@ -9,3 +9,4 @@ venv
 .DS_Store
 *~
 /http_cache.sqlite
+/subcommands/http_cache.sqlite
