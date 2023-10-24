@@ -6,7 +6,14 @@
 [![Tests](https://github.com/crossjam/feedbin-tools/workflows/Test/badge.svg)](https://github.com/crossjam/feedbin-tools/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/crossjam/feedbin-tools/blob/master/LICENSE)
 
-A command line toolkit for working with the [Feedbin HTTP API](https://github.com/feedbin/feedbin-api/)
+A command line toolkit for working with the [Feedbin HTTP
+API](https://github.com/feedbin/feedbin-api/)
+
+Right now we are focused on only reading (GET) from the Feedbin API
+for information retrieval, backup, collection, and analysis
+purposes. The cli is not intended to be a full fledged Feedbin
+client. If motivated, the mutating methods (PUT, POST) may be
+implemented in the future.
 
 ## Installation
 
@@ -82,3 +89,6 @@ Now install the dependencies and test dependencies:
 To run the tests:
 
     pytest
+	
+This is a hobby, side (very side) project. I’m grateful for PR
+submissions and filed issues, but responses might lag by quite a bit.
