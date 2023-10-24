@@ -1,4 +1,8 @@
 ## Entries
+
+See the main [README.md](../README.md) for top level options for
+logging and authentication.
+
 <!-- [[[cog
 import cog
 from feedbin_tools import cli
