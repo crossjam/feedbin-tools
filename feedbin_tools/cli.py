@@ -367,10 +367,16 @@ def entries(
         total_emitted += 1
 
 
-@cli.command(name="feedmeta")
+@cli.command(name="feedmeta", short_help="Retrieve feed metadata")
 @click.argument("feed_ids", type=click.INT, nargs=-1)
 @click.pass_context
 def feed(ctx, feed_ids):
+    """
+    Retrieve the feed information for each ID in FEED_IDS
+
+    Emit data in JSONL
+    """
+
     auth = auth_from_context(ctx)
 
     for feed_id in feed_ids:
