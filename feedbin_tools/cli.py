@@ -368,17 +368,19 @@ def entries(
 
 
 @cli.command(name="feedmeta")
-@click.argument("feed_id", type=click.INT)
+@click.argument("feed_ids", type=click.INT, nargs=-1)
 @click.pass_context
-def feed(ctx, feed_id):
+def feed(ctx, feed_ids):
     auth = auth_from_context(ctx)
-    url = f"https://api.feedbin.com/v2/feeds/{feed_id}.json"
 
-    session = requests_cache.CachedSession()
+    for feed_id in feed_ids:
+        url = f"https://api.feedbin.com/v2/feeds/{feed_id}.json"
+        session = requests_cache.CachedSession()
 
-    resp = session.get(url, auth=auth)
+        resp = session.get(url, auth=auth)
+        resp.raise_for_status()
 
-    sys.stdout.write(json.dumps(resp.json()) + "\n")
+        sys.stdout.write(json.dumps(resp.json()) + "\n")
 
     try:
         sys.stdout.close()
