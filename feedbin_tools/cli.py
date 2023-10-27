@@ -149,7 +149,9 @@ def auth_from_context(ctx):
     return auth
 
 
-@cli.command(name="subscriptions")
+@cli.command(
+    name="subscriptions", short_help="Fetch feed subscriptions for feedbin user"
+)
 @click.option(
     "--since", type=click.STRING, default="", help="Return entries after this date"
 )
@@ -196,7 +198,7 @@ def subscriptions(ctx, since, extended):
         pass
 
 
-@cli.command(name="starred")
+@cli.command(name="starred", short_help="Fetch starred entries for feedbin user")
 @click.option("-b", "--chunk-size", type=click.INT, default=75)
 @click.option("--extended/--no-extended", default=False)
 @click.option("--ids/--no-ids", default=False)
@@ -265,7 +267,7 @@ def starred(ctx, chunk_size, extended, ids, limit):
                 total_emitted += 1
 
 
-@cli.command(name="feed")
+@cli.command(name="feed", short_help="Fetch feed entries for feedbin feed")
 @click.option("--extended/--no-extended", default=False)
 @click.option("--limit", type=click.INT, default=-1)
 @click.argument("feed_id")
@@ -298,7 +300,7 @@ def feed(ctx, feed_id, extended, limit):
         total_emitted += 1
 
 
-@cli.command(name="entries")
+@cli.command(name="entries", short_help="Fetch feed entries for feedbin user")
 @click.option("--read/--unread", default=False)
 @click.option("--starred/--no-starred", default=False)
 @click.option("--extended/--no-extended", default=False)
