@@ -367,3 +367,30 @@ def entries(
         item["x-read-status"] = params["read"]
         sys.stdout.write(json.dumps(item) + "\n")
         total_emitted += 1
+
+
+@cli.command(name="feedmeta", short_help="Retrieve feed metadata")
+@click.argument("feed_ids", type=click.INT, nargs=-1)
+@click.pass_context
+def feed(ctx, feed_ids):
+    """
+    Retrieve the feed information for each ID in FEED_IDS
+
+    Emit data in JSONL
+    """
+
+    auth = auth_from_context(ctx)
+
+    for feed_id in feed_ids:
+        url = f"https://api.feedbin.com/v2/feeds/{feed_id}.json"
+        session = requests_cache.CachedSession()
+
+        resp = session.get(url, auth=auth)
+        resp.raise_for_status()
+
+        sys.stdout.write(json.dumps(resp.json()) + "\n")
+
+    try:
+        sys.stdout.close()
+    except IOError:
+        pass
