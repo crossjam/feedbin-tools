@@ -65,10 +65,11 @@ Options:
   --help             Show this message and exit.
 
 Commands:
-  entries        Fetch entries for the authed feedbin user and emit as JSON
-  feed           Fetch entries for feedbin feed FEED_ID and emit as JSON
-  starred        Fetch feedbin starred entries for the authed feedbin user...
-  subscriptions  Fetch feedbin subscriptions for the authed feedbin user...
+  entries        Fetch feed entries for feedbin user
+  feed           Fetch feed entries for feedbin feed
+  feedmeta       Retrieve feed metadata
+  starred        Fetch starred entries for feedbin user
+  subscriptions  Fetch feed subscriptions for feedbin user
 
 ```
 <!-- [[[end]]] -->
