@@ -6,7 +6,14 @@
 [![Tests](https://github.com/crossjam/feedbin-tools/workflows/Test/badge.svg)](https://github.com/crossjam/feedbin-tools/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/crossjam/feedbin-tools/blob/master/LICENSE)
 
-A command line toolkit for working with the [Feedbin HTTP API](https://github.com/feedbin/feedbin-api/)
+A command line toolkit for working with the [Feedbin HTTP
+API](https://github.com/feedbin/feedbin-api/)
+
+Right now we are focused on only reading (GET) from the Feedbin API
+for information retrieval, backup, collection, and analysis
+purposes. The cli is not intended to be a full fledged Feedbin
+client. If motivated, the mutating methods (PUT, POST) may be
+implemented in the future.
 
 ## Installation
 
@@ -26,6 +33,18 @@ You can also use:
 
     python -m feedbin_tools --help
 
+
+<!-- [[[cog
+import cog
+from feedbin_tools import cli
+from click.testing import CliRunner
+runner = CliRunner()
+result = runner.invoke(cli.cli, ["--help"])
+help = result.output.replace("Usage: cli", "Usage: feedbin-tools")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
 ```
 Usage: feedbin-tools [OPTIONS] COMMAND [ARGS]...
 
@@ -33,8 +52,8 @@ Usage: feedbin-tools [OPTIONS] COMMAND [ARGS]...
   https://github.com/feedbin/feedbin-api/
 
   Due to the use of the requests library for HTTP, .netrc is honored which is
-  another means of setting the HTTP Basic Auth user and password for the
-  feedbin endpoints
+  another means of setting the HTTP Basic Auth user and password for the feedbin
+  endpoints
 
 Options:
   --version          Show the version and exit.
@@ -48,9 +67,11 @@ Options:
 Commands:
   entries        Fetch entries for the authed feedbin user and emit as JSON
   feed           Fetch entries for feedbin feed FEED_ID and emit as JSON
-  starred        Fetch feedbin starred entries for the authed feedbin...
+  starred        Fetch feedbin starred entries for the authed feedbin user...
   subscriptions  Fetch feedbin subscriptions for the authed feedbin user...
+
 ```
+<!-- [[[end]]] -->
 
 ## Development
 
@@ -68,3 +89,6 @@ Now install the dependencies and test dependencies:
 To run the tests:
 
     pytest
+	
+This is a hobby, side (very side) project. I’m grateful for PR
+submissions and filed issues, but responses might lag by quite a bit.
